@@ -1,0 +1,19 @@
+{
+	"name": "reference_viewer",
+	"displayName": "Reference Viewer",
+	"description": "Opens a Dialog window to display a reference image",
+	"version": "0.1",
+	"author": {
+		"name": "enmarimo",
+		"url": "https://github.com/enmarimo"
+	},
+	"contributors": [],
+	"publisher": "enmarimo",
+	"license": "MIT",
+	"categories": ["Scripts"],
+	"contributes": {
+		"scripts": [
+			{"path": "./reference_viewer.lua"}
+		]
+	}
+}
