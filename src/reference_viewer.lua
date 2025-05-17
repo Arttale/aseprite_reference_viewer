@@ -82,6 +82,7 @@ function createViewer()
 		onpaint=function(ev)	
 			if active_image ~= nil then
 				local gc = ev.context
+				gc.antialias = true
 	
 				if fit_image then
 					-- Fit the image into the canvas: update scale_factor and restore
@@ -95,23 +96,31 @@ function createViewer()
 	
 				-- Updates the value of the slider with the actual value of scale_factor.
 				dlg:modify{id="scale_slider", value=scale_factor*100}
-	
+
 				local scaled_width = active_image.width * scale_factor
 				local scaled_height = active_image.height * scale_factor
 	
-				local offset_x = image_pos.x * scale_factor + (gc.width - scaled_width) / 2
-				local offset_y = image_pos.y * scale_factor + (gc.height - scaled_height) / 2
-	
-				-- Make a copy so the active_image remains unchanged. Otherwise the image
-				-- could degrade every time it is scaled. Then resize the copy to the
-				-- desired size and draw it.
-				local image = active_image:clone()
-				image:resize{width=scaled_width, height=scaled_height, method="bilinear"}
-	
+				local inverse_scale_factor = 1 / scale_factor
+
+				local offset_x = image_pos.x + (gc.width - scaled_width) / 2
+				local offset_y = image_pos.y + (gc.height - scaled_height) / 2
+
+				local image = Image(gc.width, gc.height)	
+				for i=1,gc.width do
+					for j=1,gc.height do
+						local image_x = offset_x + i * inverse_scale_factor
+						local image_y = offset_y + j * inverse_scale_factor
+						if image_x < active_image.width and image_y < active_image.height and
+						   image_x > 0 and image_y > 0 then
+							image:drawPixel(i, j, active_image:getPixel(image_x, image_y))
+						end
+					end
+				
 				gc:drawImage(
-					image, 0, 0, scaled_width, scaled_height,
-					offset_x, offset_y, scaled_width, scaled_height
+					image, 0, 0, image.width, image.height,
+					0, 0, image.width, image.height
 				)
+				end
 			end
 		end,
 		onwheel=function(ev)
@@ -144,7 +153,7 @@ function createViewer()
 			if mouse_drag then
 				local mouse = Point(ev.x, ev.y)
 				local dpos = Point((mouse.x - mouse_origin.x) / scale_factor, (mouse.y - mouse_origin.y) / scale_factor)
-				image_pos = image_origin + dpos
+				image_pos = image_origin - dpos
 				dlg:repaint()
 			end
 		end
