@@ -49,8 +49,8 @@ end
 -- Updates the scale factor with the given delta taking into account lower and upper limits.
 function updateZoom(scale_factor, delta)
 	scale_factor = scale_factor + delta
-	if scale_factor < 0 then
-		scale_factor = 0
+	if scale_factor < 0.01 then
+		scale_factor = 0.01
 	elseif scale_factor > 2 then
 		scale_factor = 2
 	end
@@ -68,7 +68,7 @@ function createViewer()
 	
 	local fit_image = false
 	
-	local scale_factor = 1
+	local scale_factor = 1.0
 	
 	local image_pos = Point(0,0)
 	local image_origin = Point(0,0)
@@ -97,29 +97,15 @@ function createViewer()
 				-- Updates the value of the slider with the actual value of scale_factor.
 				dlg:modify{id="scale_slider", value=scale_factor*100}
 
-				local scaled_width = active_image.width * scale_factor
-				local scaled_height = active_image.height * scale_factor
-	
-				local inverse_scale_factor = 1 / scale_factor
+				if scale_factor >= 0.01 then
+					local inv_scale_factor = 1 / scale_factor
 
-				local offset_x = image_pos.x + (gc.width - scaled_width) / 2
-				local offset_y = image_pos.y + (gc.height - scaled_height) / 2
-
-				local image = Image(gc.width, gc.height)	
-				for i=1,gc.width do
-					for j=1,gc.height do
-						local image_x = offset_x + i * inverse_scale_factor
-						local image_y = offset_y + j * inverse_scale_factor
-						if image_x < active_image.width and image_y < active_image.height and
-						   image_x > 0 and image_y > 0 then
-							image:drawPixel(i, j, active_image:getPixel(image_x, image_y))
-						end
-					end
-				
-				gc:drawImage(
-					image, 0, 0, image.width, image.height,
-					0, 0, image.width, image.height
-				)
+					local image = Image(active_image, Rectangle(image_pos.x, image_pos.y, gc.width * inv_scale_factor, gc.height * inv_scale_factor))
+					image:resize{width=gc.width, height=gc.height, method='bilinear'}
+					gc:drawImage(
+						image, 0, 0, image.width, image.height,
+						0, 0, image.width, image.height
+					)
 				end
 			end
 		end,
@@ -127,12 +113,28 @@ function createViewer()
 			-- Update the scale_factor when using the mouse wheel.
 			-- Tested on a laptop it works with deltaY, it should be tested on actual mouse.
 			local wheel_factor = 0.05
+			
+			local inv_scale_factor = 1 / scale_factor
+
+			-- Get the relative position of mouse respect to the image.
+			-- I would expect dx should be (ev.x - image_pos.x), but image_pos.x seems inverted
+			-- (positive values when image goes to the left and negative to the right) so it has
+			-- to be inverted here to work as expected.
+			local dx = ev.x * inv_scale_factor + image_pos.x
+			local dy = ev.y * inv_scale_factor + image_pos.y
+			
 			if ev.deltaY > 0 then
 				scale_factor = updateZoom(scale_factor, -wheel_factor)
 			else
 				scale_factor = updateZoom(scale_factor, wheel_factor)
 			end
-	
+
+			-- Keep the relative position between the mouse and image. This way, when we zoom the
+			-- image it will keep centered at the point we are zooming.
+			inv_scale_factor = 1 / scale_factor
+			image_pos.x = -ev.x * inv_scale_factor + dx
+			image_pos.y = -ev.y * inv_scale_factor + dy
+
 			-- Redraw the canvas with the updated scale_factor.
 			dlg:repaint()
 		end,
