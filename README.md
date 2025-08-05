@@ -31,7 +31,7 @@ With an image opened, it is possible to:
 * move the image by dragging it.
 
 ## Contributing
-Any suggestions and comments are welcome, but keep in mind this project is mostly a hobby an I don't guarantee any kind of support or response.
+Any suggestions and comments are welcome, but keep in mind this project is mostly a hobby and I don't guarantee any kind of support or response.
 
 If you want to expand/improve this project feel free to fork the repository or create a new one. For now I don't plan on accepting pull requests as I want to keep this as a personal
-project and don't really want to organize/maintain other people's code (sorry for the inconvenience).
+project and I would prefer to avoid organizing/maintaining other people's code (sorry for the inconvenience).
