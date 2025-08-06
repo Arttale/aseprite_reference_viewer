@@ -144,9 +144,30 @@ function createViewer()
 		--	dlg:repaint()
 		--end,
 		onmousedown=function(ev)
-			mouse_drag = true
-			mouse_origin = Point(ev.x, ev.y)
-			image_origin = image_pos
+			-- When using the eyedropper (color-picker) get the color of the
+			-- clicked pixel on the image.
+			-- Otherwise, prepare to move the image.
+			if app.tool.id == "eyedropper" then
+				if active_image ~= nil then
+					if scale_factor >= 0.01 then
+						local inv_scale_factor = 1 / scale_factor
+						local pixel = active_image:getPixel(
+							ev.x * inv_scale_factor + image_pos.x,
+							ev.y * inv_scale_factor + image_pos.y
+						);
+
+						if ev.button == MouseButton.LEFT then
+							app.fgColor = Color(pixel)
+						elseif ev.button == MouseButton.RIGHT then
+							app.bgColor = Color(pixel)
+						end
+					end
+				end
+			else
+				mouse_drag = true
+				mouse_origin = Point(ev.x, ev.y)
+				image_origin = image_pos
+			end
 		end,
 		onmouseup=function(ev)
 			mouse_drag = false
