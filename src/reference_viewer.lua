@@ -179,6 +179,27 @@ function createViewer()
 				image_pos = image_origin - dpos
 				dlg:repaint()
 			end
+		end,
+		onkeydown=function(ev)
+			if ev.ctrlKey then
+				-- When Ctrl-V, load the clipboard image.
+				-- Stop propagation of the event to prevent the image
+				-- being pasted on the main canvas.
+				ev:stopPropagation()
+
+				if ev.code == "KeyV" then
+					if app.apiVersion >= 32 and app.clipboard.image ~= nil then
+						active_image = app.clipboard.image
+
+						-- When an image is loaded, show the hidden controls
+						dlg:modify{id="scale_slider", visible=true}
+						dlg:modify{id="fit_button", visible=true}
+
+						-- redraw the canvas
+						dlg:repaint()
+					end
+				end
+			end
 		end
 	}
 	dlg:slider{
@@ -209,26 +230,26 @@ function createViewer()
 			-- When the file widget changes we want to open the selected image and draw it on
 			-- the canvas.
 			-- TODO: Check the file is actually an image.
-	
+
 			local image_filename = dlg.data.img_file
 			-- Print used for testing.
 			-- print("Image: " .. image_file)
-	
+
 			-- If the image changed, update it.
 			-- TODO: Is this check really needed?
 			if image_filename ~= active_image_filename then
 				active_image_filename = image_filename
 				active_image = Image{fromFile=active_image_filename}
-	
+
 				-- When an image is loaded, show the hidden controls
 				dlg:modify{id="scale_slider", visible=true}
 				dlg:modify{id="fit_button", visible=true}
-		
+
 				-- redraw the canvas
 				dlg:repaint()
 			end
 		end
 	}
-	
+
 	dlg:show{wait=false}
 end
