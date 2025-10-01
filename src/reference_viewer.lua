@@ -60,61 +60,106 @@ end
 
 function createViewer()
 	local dlg = Dialog("Reference viewer")
-	
+
 	-- Active image, by default empty.
 	-- We could try to store and restore the last opened image.
 	local active_image = nil
 	local active_image_filename = nil
-	
+
 	local fit_image = false
-	
+
 	local scale_factor = 1.0
-	
+	local inv_scale_factor = 1.0
+
 	local image_pos = Point(0,0)
 	local image_origin = Point(0,0)
 	local mouse_origin = Point(0,0)
 	local mouse_drag = false
-	
+
 	dlg:canvas{
 		id="img_canvas",
 		width=256,
 		height=256,
-		onpaint=function(ev)	
+		onpaint=function(ev)
 			if active_image ~= nil then
 				local gc = ev.context
 				gc.antialias = true
-	
+
+				local fit_scale = getFittingScale(gc, active_image)
+
 				if fit_image then
 					-- Fit the image into the canvas: update scale_factor and restore
 					-- the image position.
 					-- Once done disable fit_image to make sure it is only called when
 					-- requested.
-					scale_factor = getFittingScale(gc, active_image)
+					scale_factor = fit_scale
+
+					if scale_factor < 0.01 then
+						scale_factor = 0.01
+					end
+
+					inv_scale_factor = 1 / scale_factor
+
 					image_pos = Point(0,0)
 					fit_image = false
 				end
-	
+
 				-- Updates the value of the slider with the actual value of scale_factor.
 				dlg:modify{id="scale_slider", value=scale_factor*100}
 
-				if scale_factor >= 0.01 then
-					local inv_scale_factor = 1 / scale_factor
+				local image
+				-- When we zoom-in (scale_factor > fit_scale) we only
+				-- see a part of the image. We only copy what is visible
+				-- and scale it to fit the window.
+				-- When we zoom-out the image is fully visible, so
+				-- we copy the whole image and scale it to the desired
+				-- scale.
+				if scale_factor > fit_scale then
+					image = Image(
+						active_image,
+						Rectangle(
+							image_pos.x, image_pos.y,
+							gc.width * inv_scale_factor,
+							gc.height * inv_scale_factor
+						)
+					)
 
-					local image = Image(active_image, Rectangle(image_pos.x, image_pos.y, gc.width * inv_scale_factor, gc.height * inv_scale_factor))
-					image:resize{width=gc.width, height=gc.height, method='bilinear'}
+					image:resize{
+						width=gc.width, height=gc.height, method='bilinear'
+					}
+
 					gc:drawImage(
 						image, 0, 0, image.width, image.height,
 						0, 0, image.width, image.height
 					)
+				else
+					image = Image(active_image)
+
+					image:resize{
+						width=active_image.width * scale_factor,
+						height=active_image.height * scale_factor,
+						method='bilinear'
+					}
+
+					-- Position has to be negative or it doesn't work as
+					-- expected.
+					-- TODO: Check why position is negative.
+					--       This might need a refactor to make code
+					--       easier to understand.
+					gc:drawImage(
+						image, 0, 0, image.width, image.height,
+						-image_pos.x * scale_factor,
+						-image_pos.y * scale_factor,
+						image.width, image.height
+					)
 				end
+
 			end
 		end,
 		onwheel=function(ev)
 			-- Update the scale_factor when using the mouse wheel.
 			-- Tested on a laptop it works with deltaY, it should be tested on actual mouse.
 			local wheel_factor = 0.05
-			
-			local inv_scale_factor = 1 / scale_factor
 
 			-- Get the relative position of mouse respect to the image.
 			-- I would expect dx should be (ev.x - image_pos.x), but image_pos.x seems inverted
@@ -122,7 +167,7 @@ function createViewer()
 			-- to be inverted here to work as expected.
 			local dx = ev.x * inv_scale_factor + image_pos.x
 			local dy = ev.y * inv_scale_factor + image_pos.y
-			
+
 			if ev.deltaY > 0 then
 				scale_factor = updateZoom(scale_factor, -wheel_factor)
 			else
@@ -150,7 +195,7 @@ function createViewer()
 			if app.tool.id == "eyedropper" then
 				if active_image ~= nil then
 					if scale_factor >= 0.01 then
-						local inv_scale_factor = 1 / scale_factor
+
 						local pixel = active_image:getPixel(
 							ev.x * inv_scale_factor + image_pos.x,
 							ev.y * inv_scale_factor + image_pos.y
@@ -175,7 +220,10 @@ function createViewer()
 		onmousemove=function(ev)
 			if mouse_drag then
 				local mouse = Point(ev.x, ev.y)
-				local dpos = Point((mouse.x - mouse_origin.x) / scale_factor, (mouse.y - mouse_origin.y) / scale_factor)
+				local dpos = Point(
+					(mouse.x - mouse_origin.x) * inv_scale_factor,
+					(mouse.y - mouse_origin.y) * inv_scale_factor
+				)
 				image_pos = image_origin - dpos
 				dlg:repaint()
 			end
@@ -210,6 +258,13 @@ function createViewer()
 		visible=false,
 		onchange=function()
 			scale_factor = dlg.data.scale_slider / 100
+
+			if scale_factor < 0.01 then
+				scale_factor = 0.01
+			end
+
+			inv_scale_factor = 1 / scale_factor
+
 			dlg:repaint()
 		end
 	}
