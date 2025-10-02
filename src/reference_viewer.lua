@@ -85,6 +85,16 @@ function createViewer()
 				local gc = ev.context
 				gc.antialias = true
 
+				-- If the canvas size is 0 we don't need to draw
+				-- anything.
+				-- This should fix issue-1 as it prevents copying
+				-- an empty (nil) image.
+				-- The actual minimum size is 1 not 0 so, just in
+				-- case, we avoid drawing when canvas size < 2.
+				if gc.width < 2 or gc.height < 2 then
+					return
+				end
+
 				local fit_scale = getFittingScale(gc, active_image)
 
 				if fit_image then
@@ -153,7 +163,6 @@ function createViewer()
 						image.width, image.height
 					)
 				end
-
 			end
 		end,
 		onwheel=function(ev)
