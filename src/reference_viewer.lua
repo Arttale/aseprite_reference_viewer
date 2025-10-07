@@ -17,25 +17,10 @@
 -- DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-function init(plugin)
-	plugin:newMenuSeparator{
-		group="view_controls"
-	}
-	plugin:newCommand{
-		id="reference_viewer",
-		title="Reference Viewer",
-		group="view_controls",
-		onclick=function()
-			createViewer()
-		end
-	}
-end
-
-function exit(plugin)
-end
+local ReferenceViewer = {}
 
 -- Computes the scale factor that is needed to fit the Image into the GraphicsContext.
-function getFittingScale(gc, image)
+ReferenceViewer.getFittingScale = function(gc, image)
 	local factor = gc.width / image.width
 	local scaled_height = image.height * factor
 
@@ -47,7 +32,7 @@ function getFittingScale(gc, image)
 end
 
 -- Updates the scale factor with the given delta taking into account lower and upper limits.
-function updateZoom(scale_factor, delta)
+ReferenceViewer.updateZoom = function(scale_factor, delta)
 	scale_factor = scale_factor + delta
 	if scale_factor < 0.01 then
 		scale_factor = 0.01
@@ -58,7 +43,7 @@ function updateZoom(scale_factor, delta)
 	return scale_factor
 end
 
-function createViewer()
+ReferenceViewer.createViewer = function()
 	local dlg = Dialog("Reference viewer")
 
 	-- Active image, by default empty.
@@ -317,3 +302,5 @@ function createViewer()
 
 	dlg:show{wait=false}
 end
+
+return ReferenceViewer

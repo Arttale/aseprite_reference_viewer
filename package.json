@@ -13,7 +13,7 @@
 	"categories": ["Scripts"],
 	"contributes": {
 		"scripts": [
-			{"path": "./reference_viewer.lua"}
+			{"path": "./reference_viewer_extension.lua"}
 		]
 	}
 }
