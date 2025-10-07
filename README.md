@@ -9,7 +9,8 @@ This is a quick although messier implementation with a few fixes
 * fixed sizing error when image is at 0 width/height
 * infinite zoom, original version was originally capped at 200%
 * fixed integer inaccuracy at high zoom, original implementation used point() which relies on integer casting, fixed by using arrays
-* limit file selection to images only and allow user to freely select initial file directory without a console warning.
+* limit file selection to images only and allow user to freely select initial file directory without a console warning
+* allow script to run both as a extension and as a regular script for debugging/development purposes
 
 ## Planned Additions
 * fix pixel snap on zoom
