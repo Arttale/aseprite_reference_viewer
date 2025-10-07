@@ -1,7 +1,9 @@
 # Reference Viewer
 Aseprite extension to open a reference image
-This is a fork of Enmarimo reference viewer
-This is a quick although messier implementation but with a few fixes
+
+A fork of Enmarimo reference viewer
+
+This is a quick although messier implementation with a few fixes
 
 ## Fixes/Additions
 * fixed sizing error when image is at 0 width/height
