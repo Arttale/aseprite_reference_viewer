@@ -80,7 +80,9 @@ ReferenceViewer.createViewer = function(title)
 					return
 				end
 
-				local fit_scale = getFittingScale(gc, active_image)
+				local fit_scale = ReferenceViewer.getFittingScale(
+					gc, active_image
+				)
 
 				if fit_image then
 					-- Fit the image into the canvas: update scale_factor and restore
@@ -163,9 +165,13 @@ ReferenceViewer.createViewer = function(title)
 			local dy = ev.y * inv_scale_factor + image_pos.y
 
 			if ev.deltaY > 0 then
-				scale_factor = updateZoom(scale_factor, -wheel_factor)
+				scale_factor = ReferenceViewer.updateZoom(
+					scale_factor, -wheel_factor
+				)
 			else
-				scale_factor = updateZoom(scale_factor, wheel_factor)
+				scale_factor = ReferenceViewer.updateZoom(
+					scale_factor, wheel_factor
+				)
 			end
 
 			-- Keep the relative position between the mouse and image. This way, when we zoom the
