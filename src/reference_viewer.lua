@@ -1,6 +1,6 @@
 -- Reference image viewer extension for Aseprite.
 --
--- Copyright (c) 2025 enmarimo
+-- Copyright (c) 2024 enmarimo
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy of this software
 -- and associated documentation files (the “Software”), to deal in the Software without
@@ -17,10 +17,28 @@
 -- DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-local ReferenceViewer = {}
+local allowed_filetypes = {"png", "jpg", "jpeg", "bmp"}
+isPlugin = false
+
+function init(plugin)
+	isPlugin = true
+	plugin:newMenuSeparator{
+		group="view_controls"
+	}
+	plugin:newCommand{
+		id="reference_viewer",
+		title="Reference Viewer",
+		group="view_controls",
+		onclick=function()
+			createViewer()
+		end
+	}
+end
+function exit(plugin)
+end
 
 -- Computes the scale factor that is needed to fit the Image into the GraphicsContext.
-ReferenceViewer.getFittingScale = function(gc, image)
+function getFittingScale(gc, image)
 	local factor = gc.width / image.width
 	local scaled_height = image.height * factor
 
@@ -31,20 +49,21 @@ ReferenceViewer.getFittingScale = function(gc, image)
 	return factor
 end
 
--- Updates the scale factor with the given delta taking into account lower and upper limits.
-ReferenceViewer.updateZoom = function(scale_factor, delta)
-	scale_factor = scale_factor + delta
-	if scale_factor < 0.01 then
-		scale_factor = 0.01
-	elseif scale_factor > 2 then
-		scale_factor = 2
+function isValidFile(path)
+	if not app.fs.isFile(path) then
+		return false
 	end
-
-	return scale_factor
+	local ext = string.lower(app.fs.fileExtension(path))
+	for _, filetype in ipairs(allowed_filetypes) do
+		if ext == filetype then
+			return true
+		end
+	end
+	return false
 end
 
-ReferenceViewer.createViewer = function(title)
-	local dlg = Dialog(title)
+function createViewer()
+	local dlg = Dialog("Reference viewer - v1.1")
 
 	-- Active image, by default empty.
 	-- We could try to store and restore the last opened image.
@@ -56,8 +75,8 @@ ReferenceViewer.createViewer = function(title)
 	local scale_factor = 1.0
 	local inv_scale_factor = 1.0
 
-	local image_pos = Point(0,0)
-	local image_origin = Point(0,0)
+	local image_pos = { x = 0.0, y = 0.0 }
+	local image_origin = { x = 0.0, y = 0.0 }
 	local mouse_origin = Point(0,0)
 	local mouse_drag = false
 
@@ -70,19 +89,7 @@ ReferenceViewer.createViewer = function(title)
 				local gc = ev.context
 				gc.antialias = true
 
-				-- If the canvas size is 0 we don't need to draw
-				-- anything.
-				-- This should fix issue-1 as it prevents copying
-				-- an empty (nil) image.
-				-- The actual minimum size is 1 not 0 so, just in
-				-- case, we avoid drawing when canvas size < 2.
-				if gc.width < 2 or gc.height < 2 then
-					return
-				end
-
-				local fit_scale = ReferenceViewer.getFittingScale(
-					gc, active_image
-				)
+				local fit_scale = getFittingScale(gc, active_image)
 
 				if fit_image then
 					-- Fit the image into the canvas: update scale_factor and restore
@@ -97,7 +104,7 @@ ReferenceViewer.createViewer = function(title)
 
 					inv_scale_factor = 1 / scale_factor
 
-					image_pos = Point(0,0)
+					image_pos = { x = 0.0, y = 0.0 }
 					fit_image = false
 				end
 
@@ -112,6 +119,7 @@ ReferenceViewer.createViewer = function(title)
 				-- we copy the whole image and scale it to the desired
 				-- scale.
 				if scale_factor > fit_scale then
+					--crop
 					image = Image(
 						active_image,
 						Rectangle(
@@ -120,35 +128,38 @@ ReferenceViewer.createViewer = function(title)
 							gc.height * inv_scale_factor
 						)
 					)
-
-					image:resize{
-						width=gc.width, height=gc.height, method='bilinear'
-					}
-
-					gc:drawImage(
-						image, 0, 0, image.width, image.height,
-						0, 0, image.width, image.height
-					)
+					if image ~= nil then
+						--resize crop image
+						image:resize{
+							width=gc.width, height=gc.height, method='nearest'
+						}
+						--draw content
+						gc:drawImage(
+							image, 0, 0, image.width, image.height,
+							0, 0, image.width, image.height
+						)
+					end
 				else
 					image = Image(active_image)
+					if image ~= nil then
+						image:resize{
+							width=active_image.width * scale_factor,
+							height=active_image.height * scale_factor,
+							method='nearest'
+						}
 
-					image:resize{
-						width=active_image.width * scale_factor,
-						height=active_image.height * scale_factor,
-						method='bilinear'
-					}
-
-					-- Position has to be negative or it doesn't work as
-					-- expected.
-					-- TODO: Check why position is negative.
-					--       This might need a refactor to make code
-					--       easier to understand.
-					gc:drawImage(
-						image, 0, 0, image.width, image.height,
-						-image_pos.x * scale_factor,
-						-image_pos.y * scale_factor,
-						image.width, image.height
-					)
+						-- Position has to be negative or it doesn't work as
+						-- expected.
+						-- TODO: Check why position is negative.
+						--       This might need a refactor to make code
+						--       easier to understand.
+						gc:drawImage(
+							image, 0, 0, image.width, image.height,
+							-image_pos.x * scale_factor,
+							-image_pos.y * scale_factor,
+							image.width, image.height
+						)
+					end
 				end
 			end
 		end,
@@ -156,7 +167,6 @@ ReferenceViewer.createViewer = function(title)
 			-- Update the scale_factor when using the mouse wheel.
 			-- Tested on a laptop it works with deltaY, it should be tested on actual mouse.
 			local wheel_factor = 0.05
-
 			-- Get the relative position of mouse respect to the image.
 			-- I would expect dx should be (ev.x - image_pos.x), but image_pos.x seems inverted
 			-- (positive values when image goes to the left and negative to the right) so it has
@@ -165,13 +175,9 @@ ReferenceViewer.createViewer = function(title)
 			local dy = ev.y * inv_scale_factor + image_pos.y
 
 			if ev.deltaY > 0 then
-				scale_factor = ReferenceViewer.updateZoom(
-					scale_factor, -wheel_factor
-				)
+				scale_factor = scale_factor * (1 - wheel_factor)
 			else
-				scale_factor = ReferenceViewer.updateZoom(
-					scale_factor, wheel_factor
-				)
+				scale_factor = scale_factor * (1 + wheel_factor)
 			end
 
 			-- Keep the relative position between the mouse and image. This way, when we zoom the
@@ -220,11 +226,14 @@ ReferenceViewer.createViewer = function(title)
 		onmousemove=function(ev)
 			if mouse_drag then
 				local mouse = Point(ev.x, ev.y)
-				local dpos = Point(
-					(mouse.x - mouse_origin.x) * inv_scale_factor,
-					(mouse.y - mouse_origin.y) * inv_scale_factor
-				)
-				image_pos = image_origin - dpos
+				local dpos = {
+					x = (mouse.x - mouse_origin.x) * inv_scale_factor,
+					y = (mouse.y - mouse_origin.y) * inv_scale_factor
+				}
+				image_pos = {
+					x = image_origin.x - dpos.x,
+					y = image_origin.y - dpos.y
+				}
 				dlg:repaint()
 			end
 		end,
@@ -253,7 +262,7 @@ ReferenceViewer.createViewer = function(title)
 	dlg:slider{
 		id="scale_slider",
 		min=0,
-		max=200,
+		max=1000,
 		value=100,
 		visible=false,
 		onchange=function()
@@ -270,7 +279,7 @@ ReferenceViewer.createViewer = function(title)
 	}
 	dlg:button{
 		id="fit_button",
-		text="Fit",
+		text="Fit image to view",
 		visible=false,
 		onclick=function()
 			fit_image = true
@@ -281,27 +290,26 @@ ReferenceViewer.createViewer = function(title)
 		id="img_file",
 		open=true,
 		save=false,
+		filetypes=allowed_filetypes,
 		onchange=function()
 			-- When the file widget changes we want to open the selected image and draw it on
 			-- the canvas.
-			-- TODO: Check the file is actually an image.
 
 			local image_filename = dlg.data.img_file
-			-- Print used for testing.
-			-- print("Image: " .. image_file)
-
 			-- If the image changed, update it.
-			-- TODO: Is this check really needed?
-			if image_filename ~= active_image_filename then
-				active_image_filename = image_filename
-				active_image = Image{fromFile=active_image_filename}
 
-				-- When an image is loaded, show the hidden controls
-				dlg:modify{id="scale_slider", visible=true}
-				dlg:modify{id="fit_button", visible=true}
+			if isValidFile(image_filename) then
+				if image_filename ~= active_image_filename then
+					active_image_filename = image_filename
+					active_image = Image{fromFile=active_image_filename}
 
-				-- redraw the canvas
-				dlg:repaint()
+					-- When an image is loaded, show the hidden controls
+					dlg:modify{id="scale_slider", visible=true}
+					dlg:modify{id="fit_button", visible=true}
+
+					-- redraw the canvas
+					dlg:repaint()
+				end
 			end
 		end
 	}
@@ -309,4 +317,17 @@ ReferenceViewer.createViewer = function(title)
 	dlg:show{wait=false}
 end
 
-return ReferenceViewer
+--run after 0.05 second delay if not extension
+local scriptTimer = Timer{
+  interval = 0.05,
+  ontick = function()
+    if not isPlugin then
+      createViewer()
+    end
+    stopTimer()
+  end
+}
+function stopTimer()
+	scriptTimer:stop()
+end
+scriptTimer:start()
