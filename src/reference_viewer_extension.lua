@@ -28,9 +28,14 @@ function init(plugin)
 		title="Reference Viewer",
 		group="view_controls",
 		onclick=function()
-			ReferenceViewer.createViewer(
-				plugin.displayName .. " v" .. tostring(plugin.version)
-			)
+			local title
+			if(app.version.major >= 1 and app.version.minor >= 3 and app.version.path >= 13) then
+				title = plugin.displayName .. " v" .. tostring(plugin.version)
+			else
+				title = "Reference Viewer"
+			end
+
+			ReferenceViewer.createViewer(title)
 		end
 	}
 end
