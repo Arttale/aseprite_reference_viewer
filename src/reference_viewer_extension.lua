@@ -27,7 +27,11 @@ function init(plugin)
 		id="reference_viewer",
 		title="Reference Viewer",
 		group="view_controls",
-		onclick=ReferenceViewer.createViewer
+		onclick=function()
+			ReferenceViewer.createViewer(
+				plugin.displayName .. " v" .. tostring(plugin.version)
+			)
+		end
 	}
 end
 

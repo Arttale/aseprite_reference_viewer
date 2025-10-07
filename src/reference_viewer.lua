@@ -43,8 +43,8 @@ ReferenceViewer.updateZoom = function(scale_factor, delta)
 	return scale_factor
 end
 
-ReferenceViewer.createViewer = function()
-	local dlg = Dialog("Reference viewer")
+ReferenceViewer.createViewer = function(title)
+	local dlg = Dialog(title)
 
 	-- Active image, by default empty.
 	-- We could try to store and restore the last opened image.
