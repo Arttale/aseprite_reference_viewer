@@ -5,17 +5,21 @@ A fork of Enmarimo reference viewer
 
 This is a quick although messier implementation with a few fixes
 
+(and yes Enmarimo, steal as much code as you want)
+
+<img src="https://github.com/user-attachments/assets/ea082786-ed87-4642-8575-7db8d68c7943" width="500em">
+
 ## Fixes/Additions
 * fixed sizing error when image is at 0 width/height
 * infinite zoom, original version was originally capped at 200%
 * fixed integer inaccuracy at high zoom, original implementation used point() which relies on integer casting, fixed by using arrays
 * limit file selection to images only and allow user to freely select initial file directory without a console warning
 * allow script to run both as a extension and as a regular script for debugging/development purposes
+* fixed pixel snap on zoom, allow subpixel zoom
+* border added
+* checkerboard background added based on preference settings
 
 ## Planned Additions
-* fix pixel snap on zoom
-* add border for style points
-* checkerboard option for background
 * custom eye dropper icon beside cursor when using eye dropper
 
 ## Installation
