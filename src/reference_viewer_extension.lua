@@ -29,7 +29,7 @@ function init(plugin)
 		group="view_controls",
 		onclick=function()
 			local title
-			if(app.version.major >= 1 and app.version.minor >= 3 and app.version.path >= 13) then
+			if((app.version.major >= 1) and (app.version.minor >= 3) and (app.version.patch >= 13)) then
 				title = plugin.displayName .. " v" .. tostring(plugin.version)
 			else
 				title = "Reference Viewer"
