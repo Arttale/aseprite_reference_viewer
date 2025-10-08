@@ -2,7 +2,7 @@
 	"name": "reference_viewer",
 	"displayName": "Reference Viewer",
 	"description": "Opens a Dialog window to display a reference image",
-	"version": "0.5.2",
+	"version": "0.5.3",
 	"author": {
 		"name": "enmarimo",
 		"url": "https://github.com/enmarimo"
