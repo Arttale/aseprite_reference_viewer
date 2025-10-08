@@ -1,24 +1,10 @@
 -- Reference image viewer extension for Aseprite.
 --
--- Copyright (c) 2024 enmarimo
---
--- Permission is hereby granted, free of charge, to any person obtaining a copy of this software
--- and associated documentation files (the “Software”), to deal in the Software without
--- restriction, including without limitation the rights to use, copy, modify, merge, publish,
--- distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
--- Software is furnished to do so, subject to the following conditions:
---
--- The above copyright notice and this permission notice shall be included in all copies or
--- substantial portions of the Software.
---
--- THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
--- BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
--- NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
--- DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
--- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+-- Copyright (c) 2024 enmarimo MIT License
 
 local allowed_filetypes = {"png", "jpg", "jpeg", "bmp"}
 isPlugin = false
+debug_value = "test"
 
 function init(plugin)
 	isPlugin = true
@@ -49,6 +35,7 @@ function getFittingScale(gc, image)
 	return factor
 end
 
+-- check if file is valid
 function isValidFile(path)
 	if not app.fs.isFile(path) then
 		return false
@@ -63,7 +50,7 @@ function isValidFile(path)
 end
 
 function createViewer()
-	local dlg = Dialog("Reference viewer - v1.1")
+	local dlg = Dialog("Reference viewer - v1.2")
 
 	-- Active image, by default empty.
 	-- We could try to store and restore the last opened image.
@@ -80,11 +67,102 @@ function createViewer()
 	local mouse_origin = Point(0,0)
 	local mouse_drag = false
 
+	local function drawBackground(gc)
+		local docPref = app.preferences.document(app.sprite)
+		-- transparent background color
+		local color_a = docPref.bg.color1
+		local color_b = docPref.bg.color2
+
+		local inner_border_color = app.theme.color.background
+		local outer_border_color = app.theme.color.editor_sprite_border
+		local inner_accent_color = app.theme.color.editor_face
+		local outer_accent_color = app.theme.color.face
+
+		local size = scale_factor*32
+
+		--draw border function
+		local function fillBorder(borderColor,offsetBorder,edge_roundness,thickness)
+			local canvas_round_rect = Rectangle(offsetBorder, offsetBorder, gc.width-thickness-offsetBorder*2, gc.height-thickness-offsetBorder*2)
+
+			gc:beginPath()
+			gc.color = borderColor
+			gc.strokeWidth = thickness
+			gc:roundedRect(canvas_round_rect, edge_roundness, edge_roundness)
+			gc:stroke()
+		end
+		local function fillPixel(x,y)
+			gc:fillRect(Rectangle(x, y, 1, 1))
+		end
+		-- Draw RoundRect Zone
+		local offset_clipping_border = 2
+		local canvas_round_rect_small = Rectangle(offset_clipping_border, offset_clipping_border, gc.width-2-offset_clipping_border*2, gc.height-2-offset_clipping_border*2)
+
+		local pass_threshold_zoom = size<3
+		gc.color = docPref.bg.color1
+		if pass_threshold_zoom then
+			local c1 = Color(docPref.bg.color1)
+			local c2 = Color(docPref.bg.color2)
+
+			local R1, G1, B1 = c1.red, c1.green, c1.blue
+			local R2, G2, B2 = c2.red, c2.green, c2.blue
+
+			local avgColor = Color{
+			r = math.sqrt((R1^2 + R2^2) / 2),
+			g = math.sqrt((G1^2 + G2^2) / 2),
+			b = math.sqrt((B1^2 + B2^2) / 2)
+			}
+
+			gc.color = avgColor
+		end
+		-- Draw filled rounded rect
+		gc:beginPath()
+		gc:roundedRect(canvas_round_rect_small, 0, 0)
+		gc:fill()
+		-- Draw fill Border
+		fillBorder(inner_border_color,1,0,2)
+		-- Draw outer Border
+		fillBorder(outer_border_color,0,2,1)
+		-- Draw inner Border
+		fillBorder(outer_border_color,2,2,1)
+		-- draw accents
+		gc.color = inner_accent_color
+		fillPixel(2,2)
+		fillPixel(gc.width-3,2)
+		fillPixel(2,gc.height-3)
+		fillPixel(gc.width-3,gc.height-3)
+		gc.color = outer_accent_color
+		fillPixel(1,1)
+		fillPixel(gc.width-2,1)
+		fillPixel(1,gc.height-2)
+		fillPixel(gc.width-2,gc.height-2)
+
+		-- Now rebuild the path for clipping
+		gc:beginPath()
+		gc:roundedRect(canvas_round_rect_small, 0, 0)
+		gc:clip()
+
+		-- Background Grid
+		if not pass_threshold_zoom then
+			local offsetx = (image_pos.x*scale_factor)%(size*2)
+			local offsety = (image_pos.y*scale_factor)%(size*2)
+			gc.color = color_b
+			for i=0, (gc.width/size)+2, 1 do
+				for j=0, (gc.height/size)+2, 1 do
+					if((i+j) % 2 == 1) then
+						gc:fillRect(Rectangle(i * size - offsetx, j*size - offsety, size, size))
+					end
+				end
+			end
+		end
+		gc.color = Color(255, 255, 255, 255)
+	end
+
 	dlg:canvas{
 		id="img_canvas",
 		width=256,
 		height=256,
 		onpaint=function(ev)
+			drawBackground(ev.context)
 			if active_image ~= nil then
 				local gc = ev.context
 				gc.antialias = true
@@ -105,6 +183,8 @@ function createViewer()
 					inv_scale_factor = 1 / scale_factor
 
 					image_pos = { x = 0.0, y = 0.0 }
+					--reset background
+					drawBackground(ev.context)
 					fit_image = false
 				end
 
@@ -112,36 +192,51 @@ function createViewer()
 				dlg:modify{id="scale_slider", value=scale_factor*100}
 
 				local image
+
 				-- When we zoom-in (scale_factor > fit_scale) we only
 				-- see a part of the image. We only copy what is visible
-				-- and scale it to fit the window.
+				-- and scale it to fit the window. This is so that we don't have tons of lag.
+				-- We also scale and translate the final result so that we can get subpixel zoom.
 				-- When we zoom-out the image is fully visible, so
 				-- we copy the whole image and scale it to the desired
 				-- scale.
 				if scale_factor > fit_scale then
-					--crop
+					--crop - get pixel crop position
+					local crop_x = math.floor(image_pos.x)
+					local crop_y = math.floor(image_pos.y)
+					local crop_w = math.ceil(gc.width * inv_scale_factor)+1
+					local crop_h = math.ceil(gc.height * inv_scale_factor)+1
+					
+					-- get pixel offset for zoom and translate
+					local crop_x_dif= image_pos.x - crop_x
+					local crop_y_dif= image_pos.y - crop_y
+					
+					local crop_w_dif= crop_w / (gc.width * inv_scale_factor)
+					local crop_h_dif= crop_h / (gc.height * inv_scale_factor)
 					image = Image(
 						active_image,
-						Rectangle(
-							image_pos.x, image_pos.y,
-							gc.width * inv_scale_factor,
-							gc.height * inv_scale_factor
-						)
+						Rectangle(crop_x, crop_y, crop_w, crop_h)
 					)
 					if image ~= nil then
-						--resize crop image
+						--resize crop image adjusted for subpixel zoom
+						--set to nearest so that we can see actual pixels, since this is a pixel art application afterall
 						image:resize{
-							width=gc.width, height=gc.height, method='nearest'
+							width = gc.width * crop_w_dif,
+							height = gc.height * crop_h_dif,
+							method = 'nearest'
 						}
-						--draw content
+						--draw content with translated subpixel offset offset
 						gc:drawImage(
 							image, 0, 0, image.width, image.height,
-							0, 0, image.width, image.height
+							-crop_x_dif * scale_factor,
+							-crop_y_dif * scale_factor,
+							image.width, image.height
 						)
 					end
 				else
 					image = Image(active_image)
 					if image ~= nil then
+						--bilinear when we zoom out
 						image:resize{
 							width=active_image.width * scale_factor,
 							height=active_image.height * scale_factor,
@@ -259,6 +354,13 @@ function createViewer()
 			end
 		end
 	}
+	--for debugging purposes
+	dlg:label{
+		id="debug_text",
+		label="debug: ",
+		text="test",
+		visible=false
+	}
 	dlg:slider{
 		id="scale_slider",
 		min=0,
@@ -296,25 +398,24 @@ function createViewer()
 			-- the canvas.
 
 			local image_filename = dlg.data.img_file
-			-- If the image changed, update it.
+			-- check if file is valid, this is to check if the file path has been swapped out in the menu
 
 			if isValidFile(image_filename) then
-				if image_filename ~= active_image_filename then
-					active_image_filename = image_filename
-					active_image = Image{fromFile=active_image_filename}
+				active_image_filename = image_filename
+				active_image = Image{fromFile=active_image_filename}
 
-					-- When an image is loaded, show the hidden controls
-					dlg:modify{id="scale_slider", visible=true}
-					dlg:modify{id="fit_button", visible=true}
+				-- When an image is loaded, show the hidden controls
+				dlg:modify{id="scale_slider", visible=true}
+				dlg:modify{id="fit_button", visible=true}
 
-					-- redraw the canvas
-					dlg:repaint()
-				end
+				-- redraw the canvas
+				dlg:repaint()
 			end
 		end
 	}
 
 	dlg:show{wait=false}
+	dlg:repaint()
 end
 
 --run after 0.05 second delay if not extension
