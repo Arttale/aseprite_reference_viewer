@@ -7,13 +7,13 @@
 		"name": "enmarimo",
 		"url": "https://github.com/enmarimo"
 	},
-	"contributors": [],
+	"contributors": ["Arttale"],
 	"publisher": "enmarimo",
 	"license": "MIT",
 	"categories": ["Scripts"],
 	"contributes": {
 		"scripts": [
-			{"path": "./reference_viewer_extension.lua"}
+			{"path": "./reference_viewer.lua"}
 		]
 	}
 }
